@@ -7,7 +7,10 @@
 #define X_WIDTH 8
 #define Y_WIDTH 8
 
-#define SQUARE(row, column) (1ULL << (row * X_WIDTH + column))
+#define SQUARE(rank, file) (1ULL << (rank * X_WIDTH + file))
+#define SQUARE_BIT(rank, file) (rank * X_WIDTH + file)
+#define RANK(rank) (0xFFULL << (8 * (rank)))
+#define FILE(file) (0x0101010101010101ULL << (file))
 
 typedef uint64_t bitboard;
 
@@ -59,7 +62,7 @@ void print_bb(bitboard bb)
     {
         for (int j = 0; j < Y_WIDTH; j++)
         {
-            printf("%s", (bb >> SQUARE(j, i)) & 1 ? "[X]" : "[ ]");
+            printf("%s", (bb >> (j * X_WIDTH + i)) & 1 ? "[X]" : "[ ]");
         }
         printf("\n");
     }
@@ -73,6 +76,7 @@ board starting_board()
     empty.rook = SQUARE(0, 0) + SQUARE(7, 0) + SQUARE(0, 7) + SQUARE(7, 7);
     empty.bishop = SQUARE(2, 0) + SQUARE(5, 0) + SQUARE(2, 7) + SQUARE(5, 7);
     empty.knight = SQUARE(1, 0) + SQUARE(6, 0) + SQUARE(1, 7) + SQUARE(6, 7);
+
     empty.pawn = 0;
     for (int i = 0; i < X_WIDTH; i++)
     {
@@ -98,14 +102,85 @@ void print_board(board board)
     {
         for (int j = 0; j < Y_WIDTH; j++)
         {
-            printf("%s", (board.knight >> SQUARE(j, i)) & 1 ? "[X]" : "[ ]");
+            if (board.pawn >> SQUARE_BIT(j, i) & 1)
+            {
+                if (board.white >> SQUARE_BIT(j, i) & 1)
+                {
+                    printf("[P]");
+                }
+                else
+                {
+                    printf("[p]");
+                }
+            }
+            else if (board.king >> SQUARE_BIT(j, i) & 1)
+            {
+                if (board.white >> SQUARE_BIT(j, i) & 1)
+                {
+                    printf("[K]");
+                }
+                else
+                {
+                    printf("[k]");
+                }
+            }
+            else if (board.queen >> SQUARE_BIT(j, i) & 1)
+            {
+                if (board.white >> SQUARE_BIT(j, i) & 1)
+                {
+                    printf("[Q]");
+                }
+                else
+                {
+                    printf("[q]");
+                }
+            }
+            else if (board.rook >> SQUARE_BIT(j, i) & 1)
+            {
+                if (board.white >> SQUARE_BIT(j, i) & 1)
+                {
+                    printf("[R]");
+                }
+                else
+                {
+                    printf("[r]");
+                }
+            }
+            else if (board.bishop >> SQUARE_BIT(j, i) & 1)
+            {
+                if (board.white >> SQUARE_BIT(j, i) & 1)
+                {
+                    printf("[B]");
+                }
+                else
+                {
+                    printf("[b]");
+                }
+            }
+            else if (board.knight >> SQUARE_BIT(j, i) & 1)
+            {
+                if (board.white >> SQUARE_BIT(j, i) & 1)
+                {
+                    printf("[N]");
+                }
+                else
+                {
+                    printf("[n]");
+                }
+            }
+            else
+            {
+                printf("[X]");
+            }
         }
+        printf("\n");
     }
 }
 
 int main(int argc, char *argv[])
 {
     board new = starting_board();
-    print_bb(new.white & new.pawn);
+    print_bb(new.pawn);
+    print_board(new);
     return 0;
 }
