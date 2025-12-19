@@ -507,6 +507,255 @@ move *getRookMoves(game game, bitboard colour)
     return moves;
 }
 
+bitboard knightMovement(bitboard knight, bitboard blockers, short direction)
+{
+    bitboard attacks = 0;
+    bitboard ray = knight;
+    if (direction == 0)
+    {
+        ray = SHIFT_UP(SHIFT_UP(SHIFT_RIGHT(ray)));
+    }
+    else if (direction == 1)
+    {
+        ray = SHIFT_UP(SHIFT_RIGHT(SHIFT_RIGHT(ray)));
+    }
+    else if (direction == 2)
+    {
+        ray = SHIFT_DOWN(SHIFT_RIGHT(SHIFT_RIGHT(ray)));
+    }
+    else if (direction == 3)
+    {
+        ray = SHIFT_DOWN(SHIFT_DOWN(SHIFT_RIGHT(ray)));
+    }
+    else if (direction == 4)
+    {
+        ray = SHIFT_DOWN(SHIFT_DOWN(SHIFT_LEFT(ray)));
+    }
+    else if (direction == 5)
+    {
+        ray = SHIFT_DOWN(SHIFT_LEFT(SHIFT_LEFT(ray)));
+    }
+    else if (direction == 6)
+    {
+        ray = SHIFT_UP(SHIFT_LEFT(SHIFT_LEFT(ray)));
+    }
+    else if (direction == 7)
+    {
+        ray = SHIFT_UP(SHIFT_UP(SHIFT_LEFT(ray)));
+    }
+
+    attacks |= ray;
+
+    return attacks;
+}
+
+move *getKnightMoves(game game, bitboard colour)
+{
+    bitboard knights = (game.board.knight & colour);
+    bitboard allPieces = getPieces(game.board);
+    bitboard enemyPieces = allPieces & ~colour;
+
+    int maxMoves = numSignificantBits(knights) * 8;
+    move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
+    int moveCount = 0;
+
+    for (int knightNum = 0; knightNum < numSignificantBits(knights); knightNum++)
+    {
+        short activeknight = getNthSBit(knights, knightNum);
+        short knightFile = activeknight % 8;
+        short knightRank = activeknight / 8;
+        bitboard knight = 1ULL << activeknight;
+        bitboard attacks = 0;
+        for (int dir = 0; dir < 8; dir++)
+        {
+            attacks |= knightMovement(knight, allPieces, dir);
+        }
+        bitboard validMoves = attacks & ~colour;
+        while (validMoves > 0)
+        {
+            int targetSq = trailingZeros(validMoves);
+            moves[moveCount].original = (square){SQUARE_BIT(knightFile, knightRank)};
+            moves[moveCount].next = (square){SQUARE_BIT(targetSq % 8, targetSq / 8)};
+            moveCount++;
+            validMoves &= validMoves - 1;
+        }
+    }
+
+    moves[moveCount].original = (square){-1};
+    return moves;
+}
+
+bitboard queenMovement(bitboard queen, bitboard blockers, short direction)
+{
+    bitboard ray = 0;
+    bitboard attacks = 0;
+
+    for (int i = 0; i < 7; i++)
+    {
+        if (direction == 0) // top left
+        {
+            ray = SHIFT_UP(SHIFT_LEFT(ray));
+        }
+        else if (direction == 1) // down
+        {
+            ray = SHIFT_UP(SHIFT_RIGHT(ray));
+        }
+        else if (direction == 2) // left
+        {
+            ray = SHIFT_DOWN(SHIFT_RIGHT(ray));
+        }
+        else if (direction == 3) // right
+        {
+            ray = SHIFT_DOWN(SHIFT_LEFT(ray));
+        }
+        if (direction == 4) // up
+        {
+            ray = SHIFT_UP(ray);
+        }
+        else if (direction == 5) // down
+        {
+            ray = SHIFT_DOWN(ray);
+        }
+        else if (direction == 6) // left
+        {
+            ray = SHIFT_LEFT(ray);
+        }
+        else if (direction == 7) // right
+        {
+            ray = SHIFT_RIGHT(ray);
+        }
+
+        attacks |= ray;
+
+        if (ray & blockers)
+        {
+            break;
+        }
+    }
+    return attacks;
+}
+
+move *getQueenMoves(game game, bitboard colour)
+{
+    bitboard queens = (game.board.queen & colour);
+    bitboard allPieces = getPieces(game.board);
+    bitboard enemyPieces = allPieces & ~colour;
+
+    int maxMoves = numSignificantBits(queens) * 2 * (X_WIDTH - 1 + Y_WIDTH - 1);
+    move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
+    int moveCount = 0;
+
+    for (int queenNum = 0; queenNum < numSignificantBits(queens); queenNum++)
+    {
+        short activequeen = getNthSBit(queens, queenNum);
+        short queenFile = activequeen % 8;
+        short queenRank = activequeen / 8;
+        bitboard queen = 1ULL << activequeen;
+        bitboard attacks = 0;
+        for (int dir = 0; dir < 8; dir++)
+        {
+            attacks |= queenMovement(queen, allPieces, dir);
+        }
+        bitboard validMoves = attacks & ~colour;
+        while (validMoves > 0)
+        {
+            int targetSq = trailingZeros(validMoves);
+            moves[moveCount].original = (square){SQUARE_BIT(queenFile, queenRank)};
+            moves[moveCount].next = (square){SQUARE_BIT(targetSq % 8, targetSq / 8)};
+            moveCount++;
+            validMoves &= validMoves - 1;
+        }
+    }
+
+    moves[moveCount].original = (square){-1};
+    return moves;
+}
+
+bitboard kingMovement(bitboard king, bitboard blockers, short direction)
+{
+    bitboard ray = 0;
+    bitboard attacks = 0;
+    if (direction == 0) // top left
+    {
+        ray = SHIFT_UP(SHIFT_LEFT(ray));
+    }
+    else if (direction == 1) // down
+    {
+        ray = SHIFT_UP(SHIFT_RIGHT(ray));
+    }
+    else if (direction == 2) // left
+    {
+        ray = SHIFT_DOWN(SHIFT_RIGHT(ray));
+    }
+    else if (direction == 3) // right
+    {
+        ray = SHIFT_DOWN(SHIFT_LEFT(ray));
+    }
+    if (direction == 4) // up
+    {
+        ray = SHIFT_UP(ray);
+    }
+    else if (direction == 5) // down
+    {
+        ray = SHIFT_DOWN(ray);
+    }
+    else if (direction == 6) // left
+    {
+        ray = SHIFT_LEFT(ray);
+    }
+    else if (direction == 7) // right
+    {
+        ray = SHIFT_RIGHT(ray);
+    }
+
+    attacks |= ray;
+    if (ray & blockers)
+    {
+        return attacks;
+    }
+    return attacks;
+}
+
+move *getKingMoves(game game, bitboard colour)
+{
+    bitboard kings = (game.board.king & colour);
+    bitboard allPieces = getPieces(game.board);
+    bitboard enemyPieces = allPieces & ~colour;
+
+    int maxMoves = 8;
+    move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
+    int moveCount = 0;
+
+    for (int kingNum = 0; kingNum < numSignificantBits(kings); kingNum++)
+    {
+        short activeking = getNthSBit(kings, kingNum);
+        short kingFile = activeking % 8;
+        short kingRank = activeking / 8;
+        bitboard king = 1ULL << activeking;
+        bitboard attacks = 0;
+        for (int dir = 0; dir < 8; dir++)
+        {
+            attacks |= kingMovement(king, allPieces, dir);
+        }
+        bitboard validMoves = attacks & ~colour;
+        while (validMoves > 0)
+        {
+            int targetSq = trailingZeros(validMoves);
+            moves[moveCount].original = (square){SQUARE_BIT(kingFile, kingRank)};
+            moves[moveCount].next = (square){SQUARE_BIT(targetSq % 8, targetSq / 8)};
+            moveCount++;
+            validMoves &= validMoves - 1;
+        }
+    }
+
+    moves[moveCount].original = (square){-1};
+    return moves;
+}
+
+// *************************
+// engine related operations
+// *************************
+
 int main(void)
 {
 
