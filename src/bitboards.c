@@ -250,18 +250,14 @@ short *getPieceSquares(bitboard bitboard)
 short getNthSBit(bitboard bitboard, int n)
 {
     int count = 0;
-    while (n > 0)
+    while (bitboard)
     {
-        if (bitboard >> count & 1)
-        {
-            n--;
-        }
-        if (n > 0)
-        {
-            count++;
-        }
+        if ((bitboard & 1) && (n-- == 0))
+            return count;
+        bitboard = bitboard >> 1;
+        count++;
     }
-    return count;
+    return 0;
 }
 // ***************************
 // graphics related operations
