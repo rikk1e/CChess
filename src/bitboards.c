@@ -5,6 +5,7 @@
 #include <string.h>
 #include "raylib.h"
 #include "raymath.h"
+#include <unistd.h>
 
 #define X_WIDTH 8
 #define Y_WIDTH 8
@@ -24,21 +25,27 @@
 // ****************
 // type definitions
 // ****************
-typedef char *data_t;
 
-typedef struct node node_t;
-
-struct node
-{
-    data_t data;
-    node_t *next;
-    node_t *prev;
-};
+typedef short square;
 
 typedef struct
 {
-    node_t *head;
-    node_t *foot;
+    square original;
+    square next;
+} move;
+
+typedef struct node node_t;
+
+typedef struct node
+{
+    move move;
+    struct node *next;
+} node;
+
+typedef struct
+{
+    node *head;
+    node *foot;
 } list_t;
 
 typedef uint64_t bitboard;
@@ -55,14 +62,6 @@ typedef struct
     bitboard white;
     // bitboard black;
 } board;
-
-typedef short square;
-
-typedef struct
-{
-    square original;
-    square next;
-} move;
 
 typedef struct
 {
@@ -202,7 +201,6 @@ void printBoard(board board)
     }
 }
 
-// implements Brian Kernighan's algorithm
 int numSignificantBits(bitboard bitboard)
 {
     int count = 0;
@@ -371,7 +369,7 @@ void renderBoard(board board, Texture2D textures[13])
 
 game newGame()
 {
-    return (game){generateStartingBoard(), 1 << 7};
+    return (game){generateStartingBoard(), 1 << 7, 0, 0, 0};
 }
 
 bitboard bishopMovement(bitboard bishop, bitboard blockers, short direction)
@@ -860,6 +858,71 @@ move *getPawnMoves(game game)
     moves[moveCount].next = (square){-1};
     return moves;
 }
+
+void executeMove(game *game, move move)
+{
+
+    if (game->board.queen & 1ULL << move.original)
+    {
+        game->board.queen ^= 1ULL << move.original;
+        game->board.queen |= 1ULL << move.next;
+    }
+    else if (game->board.king & 1ULL << move.original)
+    {
+        game->board.king ^= 1ULL << move.original;
+        game->board.king |= 1ULL << move.next;
+    }
+    else if (game->board.pawn & 1ULL << move.original)
+    {
+        game->board.pawn ^= 1ULL << move.original;
+        game->board.pawn |= 1ULL << move.next;
+    }
+    else if (game->board.rook & 1ULL << move.original)
+    {
+        game->board.rook ^= 1ULL << move.original;
+        game->board.rook |= 1ULL << move.next;
+    }
+    else if (game->board.bishop & 1ULL << move.original)
+    {
+        game->board.bishop ^= 1ULL << move.original;
+        game->board.bishop |= 1ULL << move.next;
+    }
+    else if (game->board.knight & 1ULL << move.original)
+    {
+        game->board.knight ^= 1ULL << move.original;
+        game->board.knight |= 1ULL << move.next;
+    }
+
+    if (game->board.white & move.original)
+    {
+        game->board.white ^= 1ULL << move.original;
+        game->board.white |= 1ULL << move.next;
+    }
+    game->metadata ^= 1 << 7;
+
+    addMove(&game->moves, move);
+}
+
+void addMove(list_t *moveList, move move)
+{
+    if (moveList->head == 0)
+    {
+        moveList->head = (node *)malloc(sizeof(node));
+        moveList->head->move = move;
+        moveList->head->next = 0;
+    }
+    else
+    {
+        node *currentNode = moveList->head;
+        while (currentNode->next != 0)
+        {
+            currentNode = currentNode->next;
+        }
+        currentNode->next = (node *)malloc(sizeof(node));
+        currentNode->next->move = move;
+        currentNode->next->next = 0;
+    }
+}
 // *************************
 // engine related operations
 // *************************
@@ -889,6 +952,9 @@ int main(void)
     Texture2D textures[13] = {wk, wq, wr, wb, wn, wp, bk, bq, br, bb, bn, bp, boardTexture};
     game game = newGame();
 
+    game.moves.head = 0;
+    game.moves.foot = 0;
+
     move *moves = getPawnMoves(game);
 
     int moveCount = 0;
@@ -905,6 +971,7 @@ int main(void)
         ClearBackground(WHITE);
         DrawTextureEx(boardTexture, (Vector2){0.0, 0.0}, 0, (float)(WINDOW_HEIGHT + WINDOW_WIDTH) / 1568, WHITE);
         renderBoard(game.board, textures);
+        executeMove(&game, (move){SQUARE_BIT(0, 1), SQUARE_BIT(0, 3)});
         EndDrawing();
     }
 
