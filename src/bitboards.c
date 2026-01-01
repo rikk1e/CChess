@@ -12,8 +12,8 @@
 #define WINDOW_WIDTH 960
 #define BOARD_PADDING 8
 
-#define SQUARE(rank, file) (1ULL << (rank * X_WIDTH + file))
-#define SQUARE_BIT(rank, file) (rank * X_WIDTH + file)
+#define SQUARE(file, rank) (1ULL << (rank * X_WIDTH + file))
+#define SQUARE_BIT(file, rank) (rank * X_WIDTH + file)
 #define RANK(rank) (0xFFULL << (8 * (rank)))
 #define FILE(file) (0x0101010101010101ULL << (file))
 #define SHIFT_UP(bb) ((bb) << 8)
@@ -24,6 +24,22 @@
 // ****************
 // type definitions
 // ****************
+typedef char *data_t;
+
+typedef struct node node_t;
+
+struct node
+{
+    data_t data;
+    node_t *next;
+    node_t *prev;
+};
+
+typedef struct
+{
+    node_t *head;
+    node_t *foot;
+} list_t;
 
 typedef uint64_t bitboard;
 
@@ -52,28 +68,19 @@ typedef struct
 {
     board board;
     uint8_t metadata;
+    uint8_t en_passants[2];
+    list_t moves;
 } game;
-
-typedef char *data_t;
-
-typedef struct node node_t;
-
-struct node
-{
-    data_t data;
-    node_t *next;
-    node_t *prev;
-};
-
-typedef struct
-{
-    node_t *head;
-    node_t *foot;
-} list_t;
 
 // *************************
 // bitboard/board operations
 // *************************
+
+void printMove(move move)
+{
+    printf("%c%d", (move.original % 8) + 97, (move.original / 8) + 1);
+    printf("%c%d \n", (move.next % 8) + 97, (move.next / 8) + 1);
+}
 
 void printBB(bitboard bb)
 {
@@ -90,8 +97,8 @@ void printBB(bitboard bb)
 board generateStartingBoard()
 {
     board empty;
-    empty.king = SQUARE(4, 0) | SQUARE(4, 7);
-    empty.queen = SQUARE(3, 0) | SQUARE(3, 7);
+    empty.king = SQUARE(3, 0) | SQUARE(3, 7);
+    empty.queen = SQUARE(4, 0) | SQUARE(4, 7);
     empty.rook = SQUARE(0, 0) | SQUARE(7, 0) | SQUARE(0, 7) | SQUARE(7, 7);
     empty.bishop = SQUARE(2, 0) | SQUARE(5, 0) | SQUARE(2, 7) | SQUARE(5, 7);
     empty.knight = SQUARE(1, 0) | SQUARE(6, 0) | SQUARE(1, 7) | SQUARE(6, 7);
@@ -107,10 +114,8 @@ board generateStartingBoard()
     // empty.black = 0;
     for (int i = 0; i < X_WIDTH; i++)
     {
-        empty.white |= SQUARE(i, 6);
-        empty.white |= SQUARE(i, 7);
-        // empty.black |= SQUARE(i, 0);
-        // empty.black |= SQUARE(i, 1);
+        empty.white |= SQUARE(i, 0);
+        empty.white |= SQUARE(i, 1);
     }
 
     return empty;
@@ -509,50 +514,58 @@ move *getRookMoves(game game, bitboard colour)
 
 bitboard knightMovement(bitboard knight, bitboard blockers, short direction)
 {
-    bitboard attacks = 0;
-    bitboard ray = knight;
+    bitboard attack = knight;
     if (direction == 0)
     {
-        ray = SHIFT_UP(SHIFT_UP(SHIFT_RIGHT(ray)));
+        attack = SHIFT_UP(SHIFT_UP(SHIFT_RIGHT(attack)));
     }
     else if (direction == 1)
     {
-        ray = SHIFT_UP(SHIFT_RIGHT(SHIFT_RIGHT(ray)));
+        attack = SHIFT_UP(SHIFT_RIGHT(SHIFT_RIGHT(attack)));
     }
     else if (direction == 2)
     {
-        ray = SHIFT_DOWN(SHIFT_RIGHT(SHIFT_RIGHT(ray)));
+        attack = SHIFT_DOWN(SHIFT_RIGHT(SHIFT_RIGHT(attack)));
     }
     else if (direction == 3)
     {
-        ray = SHIFT_DOWN(SHIFT_DOWN(SHIFT_RIGHT(ray)));
+        attack = SHIFT_DOWN(SHIFT_DOWN(SHIFT_RIGHT(attack)));
     }
     else if (direction == 4)
     {
-        ray = SHIFT_DOWN(SHIFT_DOWN(SHIFT_LEFT(ray)));
+        attack = SHIFT_DOWN(SHIFT_DOWN(SHIFT_LEFT(attack)));
     }
     else if (direction == 5)
     {
-        ray = SHIFT_DOWN(SHIFT_LEFT(SHIFT_LEFT(ray)));
+        attack = SHIFT_DOWN(SHIFT_LEFT(SHIFT_LEFT(attack)));
     }
     else if (direction == 6)
     {
-        ray = SHIFT_UP(SHIFT_LEFT(SHIFT_LEFT(ray)));
+        attack = SHIFT_UP(SHIFT_LEFT(SHIFT_LEFT(attack)));
     }
     else if (direction == 7)
     {
-        ray = SHIFT_UP(SHIFT_UP(SHIFT_LEFT(ray)));
+        attack = SHIFT_UP(SHIFT_UP(SHIFT_LEFT(attack)));
     }
 
-    attacks |= ray;
-
-    return attacks;
+    return attack;
 }
 
-move *getKnightMoves(game game, bitboard colour)
+move *getKnightMoves(game game)
 {
-    bitboard knights = (game.board.knight & colour);
+
     bitboard allPieces = getPieces(game.board);
+    bitboard colour = 0;
+    if (game.metadata >> 7 & 1)
+    {
+        colour = game.board.white;
+    }
+    else
+    {
+        colour = allPieces & ~game.board.white;
+    }
+    bitboard knights = (game.board.knight & colour);
+
     bitboard enemyPieces = allPieces & ~colour;
 
     int maxMoves = numSignificantBits(knights) * 8;
@@ -587,7 +600,7 @@ move *getKnightMoves(game game, bitboard colour)
 
 bitboard queenMovement(bitboard queen, bitboard blockers, short direction)
 {
-    bitboard ray = 0;
+    bitboard ray = queen;
     bitboard attacks = 0;
 
     for (int i = 0; i < 7; i++)
@@ -673,7 +686,7 @@ move *getQueenMoves(game game, bitboard colour)
 
 bitboard kingMovement(bitboard king, bitboard blockers, short direction)
 {
-    bitboard ray = 0;
+    bitboard ray = king;
     bitboard attacks = 0;
     if (direction == 0) // top left
     {
@@ -752,12 +765,108 @@ move *getKingMoves(game game, bitboard colour)
     return moves;
 }
 
+bitboard pawnMovement(bitboard pawn, bitboard enemyPieces, bitboard friendlyPieces, bool isWhite)
+{
+    bitboard attacks = 0;
+
+    if (isWhite == true)
+    {
+        if (SHIFT_UP(SHIFT_LEFT(pawn)) & enemyPieces)
+        {
+            attacks |= SHIFT_UP(SHIFT_LEFT(pawn));
+        }
+        if (SHIFT_UP(SHIFT_RIGHT(pawn)) & enemyPieces)
+        {
+            attacks |= SHIFT_UP(SHIFT_RIGHT(pawn));
+        }
+
+        if (!(SHIFT_UP(pawn) & (friendlyPieces | enemyPieces)))
+        {
+            attacks |= SHIFT_UP(pawn);
+            if (!(SHIFT_UP(SHIFT_UP(pawn)) & (friendlyPieces | enemyPieces)) && pawn <= SQUARE(7, 1))
+            {
+                attacks |= SHIFT_UP(SHIFT_UP(pawn));
+            }
+        }
+    }
+    else
+    {
+        if (SHIFT_DOWN(SHIFT_LEFT(pawn)) & enemyPieces)
+        {
+            attacks |= SHIFT_DOWN(SHIFT_LEFT(pawn));
+        }
+        if (SHIFT_DOWN(SHIFT_RIGHT(pawn)) & enemyPieces)
+        {
+            attacks |= SHIFT_DOWN(SHIFT_RIGHT(pawn));
+        }
+
+        if (!(SHIFT_DOWN(pawn) & (friendlyPieces | enemyPieces)))
+        {
+            attacks |= SHIFT_DOWN(pawn);
+            if (!(SHIFT_DOWN(SHIFT_DOWN(pawn)) & (friendlyPieces | enemyPieces)) && pawn >= SQUARE(0, 7))
+            {
+                attacks |= SHIFT_DOWN(SHIFT_DOWN(pawn));
+            }
+        }
+    }
+    return attacks;
+}
+
+move *getPawnMoves(game game)
+{
+    bitboard pawns = 0;
+    bitboard enemyPieces = 0;
+    bitboard friendlyPieces = 0;
+    bool isWhite;
+    if (game.metadata >> 7 & 1)
+    {
+        pawns = game.board.white & game.board.pawn;
+        friendlyPieces = game.board.white;
+        enemyPieces = getPieces(game.board) & ~game.board.white;
+        isWhite = true;
+    }
+    else
+    {
+        pawns = game.board.pawn & ~game.board.white;
+        friendlyPieces = getPieces(game.board) & ~game.board.white;
+        enemyPieces = game.board.white;
+        isWhite = false;
+    }
+
+    int maxMoves = numSignificantBits(pawns) * 4; // each pawn: up to 2 pushes + 2 captures
+    move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
+    int moveCount = 0;
+
+    for (int pawnNum = 0; pawnNum < numSignificantBits(pawns); pawnNum++)
+    {
+        short activePawn = getNthSBit(pawns, pawnNum);
+        short pawnFile = activePawn % 8;
+        short pawnRank = activePawn / 8;
+        bitboard pawn = 1ULL << activePawn;
+        bitboard attacks = 0;
+        attacks |= pawnMovement(pawn, enemyPieces, friendlyPieces, isWhite);
+        bitboard validMoves = attacks;
+        while (validMoves > 0)
+        {
+            int targetSq = trailingZeros(validMoves);
+            moves[moveCount].original = (square){SQUARE_BIT(pawnFile, pawnRank)};
+            moves[moveCount].next = (square){SQUARE_BIT(targetSq % 8, targetSq / 8)};
+            moveCount++;
+            validMoves &= validMoves - 1;
+        }
+    }
+
+    moves[moveCount].original = (square){-1};
+    moves[moveCount].next = (square){-1};
+    return moves;
+}
 // *************************
 // engine related operations
 // *************************
 
 int main(void)
 {
+    ChangeDirectory("/Applications/Developer/meowl");
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Meowl Chess");
 
@@ -774,16 +883,27 @@ int main(void)
     Texture2D bb = LoadTexture("res/pieces-basic-png/black-bishop.png");
     Texture2D bn = LoadTexture("res/pieces-basic-png/black-knight.png");
     Texture2D bp = LoadTexture("res/pieces-basic-png/black-pawn.png");
-    Texture2D boardtexture = LoadTexture("res/pieces-basic-png/rect-8x8.png");
 
-    Texture2D textures[13] = {wk, wq, wr, wb, wn, wp, bk, bq, br, bb, bn, bp, boardtexture};
+    Texture2D boardTexture = LoadTexture("res/pieces-basic-png/rect-8x8.png");
+
+    Texture2D textures[13] = {wk, wq, wr, wb, wn, wp, bk, bq, br, bb, bn, bp, boardTexture};
     game game = newGame();
+
+    move *moves = getPawnMoves(game);
+
+    int moveCount = 0;
+    while (moves[moveCount].original != -1)
+    {
+        printf("%d :", moveCount);
+        printMove(moves[moveCount]);
+        moveCount++;
+    }
 
     while (!WindowShouldClose())
     {
         BeginDrawing();
         ClearBackground(WHITE);
-        DrawTextureEx(boardtexture, (Vector2){0.0, 0.0}, 0, (float)(WINDOW_HEIGHT + WINDOW_WIDTH) / 1568, WHITE);
+        DrawTextureEx(boardTexture, (Vector2){0.0, 0.0}, 0, (float)(WINDOW_HEIGHT + WINDOW_WIDTH) / 1568, WHITE);
         renderBoard(game.board, textures);
         EndDrawing();
     }
