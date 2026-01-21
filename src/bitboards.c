@@ -46,6 +46,7 @@ typedef struct
 {
     node *head;
     node *foot;
+    int length;
 } list_t;
 
 typedef uint64_t bitboard;
@@ -67,9 +68,14 @@ typedef struct
 {
     board board;
     uint8_t metadata;
-    uint8_t en_passants[2];
+    uint16_t en_passants;
     list_t moves;
 } game;
+
+// *******************
+// function prototypes
+// *******************
+void addMove(list_t *moveList, move move);
 
 // *************************
 // bitboard/board operations
@@ -405,11 +411,28 @@ bitboard bishopMovement(bitboard bishop, bitboard blockers, short direction)
     return attacks;
 }
 
-move *getBishopMoves(game game, bitboard colour)
+move *getBishopMoves(game game)
 {
-    bitboard bishops = (game.board.bishop & colour);
+    bitboard bishops = 0;
+    bitboard enemyPieces = 0;
+    bitboard friendlyPieces = 0;
     bitboard allPieces = getPieces(game.board);
-    bitboard enemyPieces = allPieces & ~colour;
+
+    bool isWhite;
+    if (game.metadata >> 7 & 1)
+    {
+        bishops = game.board.bishop & game.board.white;
+        friendlyPieces = game.board.white;
+        enemyPieces = getPieces(game.board) & ~game.board.white;
+        isWhite = true;
+    }
+    else
+    {
+        bishops = game.board.bishop & ~game.board.white;
+        friendlyPieces = getPieces(game.board) & ~game.board.white;
+        enemyPieces = game.board.white;
+        isWhite = false;
+    }
 
     int maxMoves = numSignificantBits(bishops) * (X_WIDTH - 1 + Y_WIDTH - 1);
     move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
@@ -426,7 +449,7 @@ move *getBishopMoves(game game, bitboard colour)
         {
             attacks |= bishopMovement(bishop, allPieces, dir);
         }
-        bitboard validMoves = attacks & ~colour;
+        bitboard validMoves = attacks & ~friendlyPieces;
         while (validMoves > 0)
         {
             int targetSq = trailingZeros(validMoves);
@@ -474,11 +497,28 @@ bitboard rookMovement(bitboard rook, bitboard blockers, int direction)
     return attacks;
 }
 
-move *getRookMoves(game game, bitboard colour)
+move *getRookMoves(game game)
 {
-    bitboard rooks = (game.board.rook & colour);
+    bitboard rooks = 0;
+    bitboard enemyPieces = 0;
+    bitboard friendlyPieces = 0;
     bitboard allPieces = getPieces(game.board);
-    bitboard enemyPieces = allPieces & ~colour;
+
+    bool isWhite;
+    if (game.metadata >> 7 & 1)
+    {
+        rooks = game.board.rook & game.board.white;
+        friendlyPieces = game.board.white;
+        enemyPieces = getPieces(game.board) & ~game.board.white;
+        isWhite = true;
+    }
+    else
+    {
+        rooks = game.board.rook & ~game.board.white;
+        friendlyPieces = getPieces(game.board) & ~game.board.white;
+        enemyPieces = game.board.white;
+        isWhite = false;
+    }
 
     int maxMoves = numSignificantBits(rooks) * (X_WIDTH - 1 + Y_WIDTH - 1);
     move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
@@ -495,7 +535,7 @@ move *getRookMoves(game game, bitboard colour)
         {
             attacks |= rookMovement(rook, allPieces, dir);
         }
-        bitboard validMoves = attacks & ~colour;
+        bitboard validMoves = attacks & ~friendlyPieces;
         while (validMoves > 0)
         {
             int targetSq = trailingZeros(validMoves);
@@ -646,11 +686,28 @@ bitboard queenMovement(bitboard queen, bitboard blockers, short direction)
     return attacks;
 }
 
-move *getQueenMoves(game game, bitboard colour)
+move *getQueenMoves(game game)
 {
-    bitboard queens = (game.board.queen & colour);
+    bitboard queens = 0;
+    bitboard enemyPieces = 0;
+    bitboard friendlyPieces = 0;
     bitboard allPieces = getPieces(game.board);
-    bitboard enemyPieces = allPieces & ~colour;
+
+    bool isWhite;
+    if (game.metadata >> 7 & 1)
+    {
+        queens = game.board.queen & game.board.white;
+        friendlyPieces = game.board.white;
+        enemyPieces = getPieces(game.board) & ~game.board.white;
+        isWhite = true;
+    }
+    else
+    {
+        queens = game.board.queen & ~game.board.white;
+        friendlyPieces = getPieces(game.board) & ~game.board.white;
+        enemyPieces = game.board.white;
+        isWhite = false;
+    }
 
     int maxMoves = numSignificantBits(queens) * 2 * (X_WIDTH - 1 + Y_WIDTH - 1);
     move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
@@ -667,7 +724,7 @@ move *getQueenMoves(game game, bitboard colour)
         {
             attacks |= queenMovement(queen, allPieces, dir);
         }
-        bitboard validMoves = attacks & ~colour;
+        bitboard validMoves = attacks & ~friendlyPieces;
         while (validMoves > 0)
         {
             int targetSq = trailingZeros(validMoves);
@@ -727,11 +784,28 @@ bitboard kingMovement(bitboard king, bitboard blockers, short direction)
     return attacks;
 }
 
-move *getKingMoves(game game, bitboard colour)
+move *getKingMoves(game game)
 {
-    bitboard kings = (game.board.king & colour);
+    bitboard kings = 0;
+    bitboard enemyPieces = 0;
+    bitboard friendlyPieces = 0;
     bitboard allPieces = getPieces(game.board);
-    bitboard enemyPieces = allPieces & ~colour;
+
+    bool isWhite;
+    if (game.metadata >> 7 & 1)
+    {
+        kings = game.board.king & game.board.white;
+        friendlyPieces = game.board.white;
+        enemyPieces = getPieces(game.board) & ~game.board.white;
+        isWhite = true;
+    }
+    else
+    {
+        kings = game.board.king & ~game.board.white;
+        friendlyPieces = getPieces(game.board) & ~game.board.white;
+        enemyPieces = game.board.white;
+        isWhite = false;
+    }
 
     int maxMoves = 8;
     move *moves = (move *)malloc((maxMoves + 1) * sizeof(move));
@@ -748,7 +822,7 @@ move *getKingMoves(game game, bitboard colour)
         {
             attacks |= kingMovement(king, allPieces, dir);
         }
-        bitboard validMoves = attacks & ~colour;
+        bitboard validMoves = attacks & ~friendlyPieces;
         while (validMoves > 0)
         {
             int targetSq = trailingZeros(validMoves);
@@ -763,7 +837,7 @@ move *getKingMoves(game game, bitboard colour)
     return moves;
 }
 
-bitboard pawnMovement(bitboard pawn, bitboard enemyPieces, bitboard friendlyPieces, bool isWhite)
+bitboard pawnMovement(bitboard pawn, bitboard enemyPieces, bitboard friendlyPieces, bool isWhite, uint16_t *metadata)
 {
     bitboard attacks = 0;
 
@@ -784,6 +858,7 @@ bitboard pawnMovement(bitboard pawn, bitboard enemyPieces, bitboard friendlyPiec
             if (!(SHIFT_UP(SHIFT_UP(pawn)) & (friendlyPieces | enemyPieces)) && pawn <= SQUARE(7, 1))
             {
                 attacks |= SHIFT_UP(SHIFT_UP(pawn));
+                *metadata |= (1 << FILE(pawn));
             }
         }
     }
@@ -801,9 +876,10 @@ bitboard pawnMovement(bitboard pawn, bitboard enemyPieces, bitboard friendlyPiec
         if (!(SHIFT_DOWN(pawn) & (friendlyPieces | enemyPieces)))
         {
             attacks |= SHIFT_DOWN(pawn);
-            if (!(SHIFT_DOWN(SHIFT_DOWN(pawn)) & (friendlyPieces | enemyPieces)) && pawn >= SQUARE(0, 7))
+            if (!(SHIFT_DOWN(SHIFT_DOWN(pawn)) & (friendlyPieces | enemyPieces)) && pawn >= SQUARE(0, 6))
             {
                 attacks |= SHIFT_DOWN(SHIFT_DOWN(pawn));
+                *metadata |= 1 << (FILE(pawn) + 7);
             }
         }
     }
@@ -818,7 +894,7 @@ move *getPawnMoves(game game)
     bool isWhite;
     if (game.metadata >> 7 & 1)
     {
-        pawns = game.board.white & game.board.pawn;
+        pawns = game.board.pawn & game.board.white;
         friendlyPieces = game.board.white;
         enemyPieces = getPieces(game.board) & ~game.board.white;
         isWhite = true;
@@ -842,7 +918,7 @@ move *getPawnMoves(game game)
         short pawnRank = activePawn / 8;
         bitboard pawn = 1ULL << activePawn;
         bitboard attacks = 0;
-        attacks |= pawnMovement(pawn, enemyPieces, friendlyPieces, isWhite);
+        attacks |= pawnMovement(pawn, enemyPieces, friendlyPieces, isWhite, &game.en_passants);
         bitboard validMoves = attacks;
         while (validMoves > 0)
         {
@@ -861,6 +937,12 @@ move *getPawnMoves(game game)
 
 void executeMove(game *game, move move)
 {
+
+    if (game->board.white & 1ULL << move.original)
+    {
+        game->board.white ^= 1ULL << move.original;
+        game->board.white ^= 1ULL << move.next;
+    }
 
     if (game->board.queen & 1ULL << move.original)
     {
@@ -893,14 +975,7 @@ void executeMove(game *game, move move)
         game->board.knight |= 1ULL << move.next;
     }
 
-    if (game->board.white & move.original)
-    {
-        game->board.white ^= 1ULL << move.original;
-        game->board.white |= 1ULL << move.next;
-    }
     game->metadata ^= 1 << 7;
-
-    addMove(&game->moves, move);
 }
 
 void addMove(list_t *moveList, move move)
@@ -922,6 +997,54 @@ void addMove(list_t *moveList, move move)
         currentNode->next->move = move;
         currentNode->next->next = 0;
     }
+}
+
+int getNumValidMoves(game game)
+{
+    int rval = 0;
+    int count = 0;
+    while ((getPawnMoves(game))[count].original != -1)
+    {
+        count++;
+        rval++;
+    }
+    count = 0;
+    while ((getKingMoves(game))[count].original != -1)
+    {
+        count++;
+        rval++;
+    }
+    count = 0;
+    while ((getRookMoves(game))[count].original != -1)
+    {
+        count++;
+        rval++;
+    }
+    count = 0;
+    while ((getKnightMoves(game))[count].original != -1)
+    {
+        count++;
+        rval++;
+    }
+    count = 0;
+    while ((getQueenMoves(game))[count].original != -1)
+    {
+        count++;
+        rval++;
+    }
+    count = 0;
+    while ((getBishopMoves(game))[count].original != -1)
+    {
+        count++;
+        rval++;
+    }
+    count = 0;
+    return rval;
+}
+
+move *getValidMoves(game game)
+{
+    move *rval = 0;
 }
 // *************************
 // engine related operations
@@ -956,12 +1079,15 @@ int main(void)
     game.moves.foot = 0;
 
     move *moves = getPawnMoves(game);
+    executeMove(&game, moves[1]);
+    move *moves2 = getPawnMoves(game);
+    executeMove(&game, moves2[3]);
 
     int moveCount = 0;
-    while (moves[moveCount].original != -1)
+    while (moves2[moveCount].original != -1)
     {
         printf("%d :", moveCount);
-        printMove(moves[moveCount]);
+        printMove(moves2[moveCount]);
         moveCount++;
     }
 
